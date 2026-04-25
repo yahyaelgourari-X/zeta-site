@@ -388,11 +388,11 @@ export default function ZetaWeb() {
           <div className={`mx-auto flex justify-between items-center transition-all duration-700 ease-in-out ${isScrolled ? 'max-w-[1400px] px-4 md:px-8' : 'max-w-none px-8 md:px-10'}`}>
             
             <div className={`nav-links-group hidden lg:flex flex-1 justify-start ${isScrolled ? 'space-x-6 xl:space-x-8' : 'space-x-8 xl:space-x-10'}`}>
-              <a href="#apropos" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Notre Histoire</a>
-              <a href="#galerie" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Galerie</a>
-              <a href="#boutique" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Boutique</a>
-              <a href="#consultant" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-1 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>
-                Styliste IA <Sparkles size={12} className="text-[#C9191E]"/>
+              <a href="#apropos" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Notre Histoire</a>
+              <a href="#galerie" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Galerie</a>
+              <a href="#boutique" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Boutique</a>
+              <a href="#consultant" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-1 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">
+                Styliste IA <Sparkles size={12} className="text-[#111111]"/>
               </a>
             </div>
 
@@ -402,17 +402,17 @@ export default function ZetaWeb() {
             </div>
 
             <div className={`nav-links-group flex flex-1 justify-end items-center ${isScrolled ? 'space-x-6 xl:space-x-8' : 'space-x-8 xl:space-x-10'}`}>
-              <a href="#contact" className={`hidden md:block text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Contact</a>
-              <button onClick={() => setIsSearchOpen(true)} className={`transition-all duration-300 ${isScrolled ? 'rounded-full p-2.5 text-[#111111] hover:text-[#C9191E] hover:bg-[#111111]/4' : 'text-[#C9191E] hover:opacity-70'}`}>
+              <a href="#contact" className="hidden md:block text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Contact</a>
+              <button onClick={() => setIsSearchOpen(true)} className="transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
                 <Search size={20} strokeWidth={1.5} />
               </button>
-              <button onClick={() => setIsCartOpen(true)} className={`relative transition-all duration-300 ${isScrolled ? 'rounded-full p-2.5 text-[#111111] hover:text-[#C9191E] hover:bg-[#111111]/4' : 'text-[#C9191E] hover:opacity-70'}`}>
+              <button onClick={() => setIsCartOpen(true)} className="relative transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
                 <ShoppingBag size={20} strokeWidth={1.5} />
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-2 bg-[#C9191E] text-[#FCF2E6] text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full animate-in zoom-in">{cartCount}</span>
                 )}
               </button>
-              <button className={`lg:hidden transition-all duration-300 ${isScrolled ? 'rounded-full p-2.5 text-[#111111] hover:text-[#C9191E] hover:bg-[#111111]/4' : 'text-[#C9191E] hover:opacity-70'}`}>
+              <button className="lg:hidden transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
                 <Menu size={24} strokeWidth={1.5} />
               </button>
             </div>
