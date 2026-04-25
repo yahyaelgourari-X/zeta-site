@@ -422,12 +422,18 @@ export default function ZetaWeb() {
         {/* 2. HERO SECTION */}
         <section className="pb-16 w-screen relative left-1/2 -translate-x-1/2 animate-on-scroll">
           <div ref={heroFrameRef} className="hero-shell relative overflow-hidden group border border-[#111111]/5 shadow-xl">
-            {/* Image d'accueil générée dynamiquement */}
-            <SafeImage 
-              src="/hero.jpg"
-              alt="Intérieur Boho Chic Zeta" 
+            {/* Vidéo hero plein écran avec fallback poster pour le premier frame */}
+            <video
               className="hero-media w-full h-full object-cover object-center"
-            />
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              poster="/hero.jpg"
+            >
+              <source src="/hero-video.mp4" type="video/mp4" />
+            </video>
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#111111]/50"></div>
             <div className="absolute inset-x-0 bottom-0 p-8 md:p-16 flex flex-col md:flex-row md:items-end justify-between">
               <div className="hero-copy max-w-2xl text-[#FCF2E6] animate-on-scroll delay-100">
