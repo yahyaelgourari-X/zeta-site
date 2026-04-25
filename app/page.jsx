@@ -169,15 +169,58 @@ export default function ZetaWeb() {
   const [aiRecommendation, setAiRecommendation] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const pageRootRef = useRef<HTMLDivElement | null>(null);
+  const heroFrameRef = useRef<HTMLDivElement | null>(null);
 
   // === EFFETS SIDE (SCROLL & ANIMATIONS) ===
   useEffect(() => {
+    const updateHeroFrame = (scrollY: number) => {
+      if (!heroFrameRef.current) return;
+
+      const progress = Math.min(Math.max(scrollY / 260, 0), 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const viewportWidth = window.innerWidth;
+      const framedGap = viewportWidth >= 1280 ? 180 : viewportWidth >= 768 ? 96 : 28;
+      const framedWidth = Math.min(1600, viewportWidth - framedGap);
+      const width = viewportWidth - ((viewportWidth - framedWidth) * eased);
+      const startHeight = window.innerHeight * (viewportWidth >= 768 ? 0.97 : 0.84);
+      const endHeight = window.innerHeight * (viewportWidth >= 768 ? 0.84 : 0.72);
+      const height = startHeight - ((startHeight - endHeight) * eased);
+
+      heroFrameRef.current.style.width = `${width}px`;
+      heroFrameRef.current.style.height = `${height}px`;
+      heroFrameRef.current.style.borderRadius = `${26 * eased}px`;
+      heroFrameRef.current.style.setProperty('--hero-image-scale', `${1.12 - (0.12 * eased)}`);
+
+      if (pageRootRef.current) {
+        pageRootRef.current.style.setProperty('--hero-copy-y', `${48 * eased}px`);
+        pageRootRef.current.style.setProperty('--hero-copy-opacity', `${1 - (0.24 * eased)}`);
+        pageRootRef.current.style.setProperty('--hero-cta-y', `${26 * eased}px`);
+        pageRootRef.current.style.setProperty('--nav-brand-scale', `${1.42 - (0.42 * eased)}`);
+        pageRootRef.current.style.setProperty('--nav-brand-y', `${34 - (34 * eased)}px`);
+        pageRootRef.current.style.setProperty('--nav-brand-opacity', `${0.92 + (0.08 * eased)}`);
+        pageRootRef.current.style.setProperty('--nav-links-y', `${8 - (8 * eased)}px`);
+        pageRootRef.current.style.setProperty('--nav-links-scale', `${1.04 - (0.04 * eased)}`);
+        pageRootRef.current.style.setProperty('--nav-links-opacity', `${0.96 + (0.04 * eased)}`);
+      }
+    };
+
+    let frameId = 0;
+
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      if (frameId) return;
+
+      frameId = window.requestAnimationFrame(() => {
+        const scrollY = window.scrollY;
+        setIsScrolled(scrollY > 50);
       // Vérifier si on est en bas de page (avec une marge de 50px)
-      setIsAtBottom(Math.ceil(window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 50);
+        setIsAtBottom(Math.ceil(window.innerHeight + scrollY) >= document.documentElement.scrollHeight - 50);
+        updateHeroFrame(scrollY);
+        frameId = 0;
+      });
     };
     window.addEventListener('scroll', handleScroll);
+    window.addEventListener('resize', handleScroll);
     
     // Initial check
     handleScroll();
@@ -195,7 +238,11 @@ export default function ZetaWeb() {
     animatedElements.forEach((el) => observer.observe(el));
 
     return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
       animatedElements.forEach((el) => observer.unobserve(el));
     };
   }, []);
@@ -232,7 +279,7 @@ export default function ZetaWeb() {
   };
 
   return (
-    <div className="w-full bg-[#FCF2E6] text-[#111111] font-sans selection:bg-[#C9191E] selection:text-[#FCF2E6] overflow-x-hidden relative">
+    <div ref={pageRootRef} className="w-full bg-[#FCF2E6] text-[#111111] font-sans selection:bg-[#C9191E] selection:text-[#FCF2E6] overflow-x-hidden relative">
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=El+Messiri:wght@400;500;600;700&family=Montserrat:wght@200;300;400;500;600;700&display=swap');
         
@@ -258,6 +305,51 @@ export default function ZetaWeb() {
         .delay-200 { transition-delay: 200ms; }
         .delay-300 { transition-delay: 300ms; }
         .delay-400 { transition-delay: 400ms; }
+
+        .hero-shell {
+          width: 100vw;
+          height: 97vh;
+          margin-inline: auto;
+          border-radius: 0;
+          --hero-image-scale: 1.12;
+          transition: width 180ms linear, height 180ms linear, border-radius 180ms linear;
+          will-change: width, height, border-radius;
+        }
+
+        .hero-media {
+          transform: scale(var(--hero-image-scale));
+          transition: transform 180ms linear, opacity 700ms ease;
+          will-change: transform;
+        }
+
+        .hero-copy {
+          transform: translateY(var(--hero-copy-y, 0px));
+          opacity: var(--hero-copy-opacity, 1);
+          transition: transform 180ms linear, opacity 180ms linear;
+          will-change: transform, opacity;
+        }
+
+        .hero-cta {
+          transform: translateY(var(--hero-cta-y, 0px));
+          opacity: var(--hero-copy-opacity, 1);
+          transition: transform 180ms linear, opacity 180ms linear;
+          will-change: transform, opacity;
+        }
+
+        .nav-brand {
+          transform: translateY(var(--nav-brand-y, 34px)) scale(var(--nav-brand-scale, 1.42));
+          opacity: var(--nav-brand-opacity, 0.92);
+          transform-origin: center top;
+          transition: transform 180ms linear, opacity 180ms linear;
+          will-change: transform, opacity;
+        }
+
+        .nav-links-group {
+          transform: translateY(var(--nav-links-y, 8px)) scale(var(--nav-links-scale, 1.04));
+          opacity: var(--nav-links-opacity, 0.96);
+          transition: transform 180ms linear, opacity 180ms linear;
+          will-change: transform, opacity;
+        }
       `}} />
 
       {/* TOAST NOTIFICATION */}
@@ -292,35 +384,35 @@ export default function ZetaWeb() {
       <div className="bg-[#FCF2E6] w-full relative z-10">
 
         {/* 1. NAVIGATION */}
-        <nav className={`fixed w-full z-50 transition-all duration-700 ease-in-out ${isScrolled ? 'bg-[#FCF2E6]/95 backdrop-blur-md py-4 border-b border-[#111111]/5 shadow-sm' : 'bg-transparent py-8'}`}>
-          <div className="max-w-[1400px] mx-auto px-4 md:px-8 flex justify-between items-center">
+        <nav className={`fixed w-full z-50 transition-all duration-700 ease-in-out ${isScrolled ? 'bg-[#FCF2E6] py-4 border-b border-[#111111]/5 shadow-sm' : 'bg-transparent py-7'}`}>
+          <div className={`mx-auto flex justify-between items-center transition-all duration-700 ease-in-out ${isScrolled ? 'max-w-[1400px] px-4 md:px-8' : 'max-w-none px-8 md:px-10'}`}>
             
-            <div className="hidden lg:flex flex-1 justify-start space-x-6 xl:space-x-10">
-              <a href="#apropos" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] hover:text-[#C9191E] transition-colors whitespace-nowrap">Notre Histoire</a>
-              <a href="#galerie" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] hover:text-[#C9191E] transition-colors whitespace-nowrap">Galerie</a>
-              <a href="#boutique" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] hover:text-[#C9191E] transition-colors whitespace-nowrap">Boutique</a>
-              <a href="#consultant" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] hover:text-[#C9191E] transition-colors flex items-center gap-1 whitespace-nowrap">
+            <div className={`nav-links-group hidden lg:flex flex-1 justify-start ${isScrolled ? 'space-x-6 xl:space-x-8' : 'space-x-8 xl:space-x-10'}`}>
+              <a href="#apropos" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Notre Histoire</a>
+              <a href="#galerie" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Galerie</a>
+              <a href="#boutique" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Boutique</a>
+              <a href="#consultant" className={`text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-1 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>
                 Styliste IA <Sparkles size={12} className="text-[#C9191E]"/>
               </a>
             </div>
 
-            <div className="flex-shrink-0 cursor-pointer transition-transform duration-300 hover:scale-105 flex items-center justify-center gap-3 px-4" onClick={scrollToTop}>
+            <div className="nav-brand flex-shrink-0 cursor-pointer flex items-center justify-center gap-3 px-4" onClick={scrollToTop}>
               <ZetaLogoIcon className="h-8 w-8 md:h-10 md:w-10 text-[#C9191E]" />
               <span className="font-brand font-bold text-2xl md:text-4xl text-[#C9191E] leading-none pt-1">Zeta</span>
             </div>
 
-            <div className="flex flex-1 justify-end items-center space-x-6 xl:space-x-8">
-              <a href="#contact" className="hidden md:block text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] hover:text-[#C9191E] transition-colors whitespace-nowrap">Contact</a>
-              <button onClick={() => setIsSearchOpen(true)} className="text-[#111111] hover:text-[#C9191E] transition-colors">
+            <div className={`nav-links-group flex flex-1 justify-end items-center ${isScrolled ? 'space-x-6 xl:space-x-8' : 'space-x-8 xl:space-x-10'}`}>
+              <a href="#contact" className={`hidden md:block text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap ${isScrolled ? 'text-[#111111] hover:text-[#C9191E]' : 'text-[#C9191E] hover:opacity-70'}`}>Contact</a>
+              <button onClick={() => setIsSearchOpen(true)} className={`transition-all duration-300 ${isScrolled ? 'rounded-full p-2.5 text-[#111111] hover:text-[#C9191E] hover:bg-[#111111]/4' : 'text-[#C9191E] hover:opacity-70'}`}>
                 <Search size={20} strokeWidth={1.5} />
               </button>
-              <button onClick={() => setIsCartOpen(true)} className="text-[#111111] hover:text-[#C9191E] transition-colors relative">
+              <button onClick={() => setIsCartOpen(true)} className={`relative transition-all duration-300 ${isScrolled ? 'rounded-full p-2.5 text-[#111111] hover:text-[#C9191E] hover:bg-[#111111]/4' : 'text-[#C9191E] hover:opacity-70'}`}>
                 <ShoppingBag size={20} strokeWidth={1.5} />
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-2 bg-[#C9191E] text-[#FCF2E6] text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full animate-in zoom-in">{cartCount}</span>
                 )}
               </button>
-              <button className="lg:hidden text-[#111111]">
+              <button className={`lg:hidden transition-all duration-300 ${isScrolled ? 'rounded-full p-2.5 text-[#111111] hover:text-[#C9191E] hover:bg-[#111111]/4' : 'text-[#C9191E] hover:opacity-70'}`}>
                 <Menu size={24} strokeWidth={1.5} />
               </button>
             </div>
@@ -328,23 +420,22 @@ export default function ZetaWeb() {
         </nav>
 
         {/* 2. HERO SECTION */}
-        <section className="pt-32 pb-16 px-4 md:px-8 max-w-[1600px] mx-auto animate-on-scroll">
-          <div className="relative w-full h-[75vh] md:h-[85vh] rounded-lg overflow-hidden group border border-[#111111]/5 shadow-xl">
+        <section className="pb-16 w-screen relative left-1/2 -translate-x-1/2 animate-on-scroll">
+          <div ref={heroFrameRef} className="hero-shell relative overflow-hidden group border border-[#111111]/5 shadow-xl">
             {/* Image d'accueil générée dynamiquement */}
             <SafeImage 
               src="/hero.jpg"
               alt="Intérieur Boho Chic Zeta" 
-              className="w-full h-full object-cover object-center scale-105 group-hover:scale-100 transition-transform duration-[1.5s] ease-out"
+              className="hero-media w-full h-full object-cover object-center"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#111111]/50"></div>
-            
             <div className="absolute inset-x-0 bottom-0 p-8 md:p-16 flex flex-col md:flex-row md:items-end justify-between">
-              <div className="max-w-2xl text-[#FCF2E6] animate-on-scroll delay-100">
+              <div className="hero-copy max-w-2xl text-[#FCF2E6] animate-on-scroll delay-100">
                 <span className="text-xs uppercase tracking-[0.3em] font-semibold mb-6 block drop-shadow-md opacity-90">Nouvelle Collection · Automne 2026</span>
                 <h2 className="font-brand text-5xl md:text-7xl mb-6 leading-[1.1] drop-shadow-2xl shadow-black">L'âme de l'Atlas,<br />l'élégance absolue.</h2>
               </div>
               
-              <div className="mt-8 md:mt-0 animate-on-scroll delay-200">
+              <div className="hero-cta mt-8 md:mt-0 animate-on-scroll delay-200">
                  <a href="#boutique" className="group flex items-center justify-center w-36 h-36 rounded-full border border-[#FCF2E6]/30 bg-[#FCF2E6]/10 backdrop-blur-md hover:bg-[#C9191E] hover:border-[#C9191E] transition-all duration-500 ease-out cursor-pointer text-decoration-none">
                     <span className="text-[#FCF2E6] text-xs font-semibold uppercase tracking-widest text-center flex flex-col items-center">
                       Boutique
