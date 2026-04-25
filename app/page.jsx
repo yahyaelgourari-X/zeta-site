@@ -169,12 +169,12 @@ export default function ZetaWeb() {
   const [aiRecommendation, setAiRecommendation] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
-  const pageRootRef = useRef<HTMLDivElement | null>(null);
-  const heroFrameRef = useRef<HTMLDivElement | null>(null);
+  const pageRootRef = useRef(null);
+  const heroFrameRef = useRef(null);
 
   // === EFFETS SIDE (SCROLL & ANIMATIONS) ===
   useEffect(() => {
-    const updateHeroFrame = (scrollY: number) => {
+    const updateHeroFrame = (scrollY) => {
       if (!heroFrameRef.current) return;
 
       const progress = Math.min(Math.max(scrollY / 260, 0), 1);
