@@ -105,12 +105,21 @@ export default function ZetaWeb() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeCollection, setActiveCollection] = useState('all');
 
   // === ÉTATS DU PANIER ===
   const [cartItems, setCartItems] = useState([]);
   
   const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const boutiqueCollections = [
+    { id: 'all', label: 'Tout voir' },
+    { id: 'beni-ouarain', label: 'Beni Ouarain' },
+    { id: 'kilim', label: 'Kilim' },
+    { id: 'zanafi', label: 'Zanafi' },
+  ];
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -171,6 +180,17 @@ export default function ZetaWeb() {
   const [aiError, setAiError] = useState('');
   const pageRootRef = useRef(null);
   const heroFrameRef = useRef(null);
+  const heroSectionRef = useRef(null);
+  const heroCtaRef = useRef(null);
+
+  useEffect(() => {
+    const shouldLockScroll = isMobileMenuOpen || isSearchOpen || isCartOpen || isCheckoutModalOpen;
+    document.body.style.overflow = shouldLockScroll ? 'hidden' : '';
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen, isSearchOpen, isCartOpen, isCheckoutModalOpen]);
 
   // === EFFETS SIDE (SCROLL & ANIMATIONS) ===
   useEffect(() => {
@@ -247,6 +267,84 @@ export default function ZetaWeb() {
     };
   }, []);
 
+  useEffect(() => {
+    const heroSection = heroSectionRef.current;
+    const heroFrame = heroFrameRef.current;
+    const pageRoot = pageRootRef.current;
+    const heroCta = heroCtaRef.current;
+
+    if (!heroSection || !heroFrame || !pageRoot || !heroCta || window.matchMedia('(pointer: coarse)').matches) {
+      return;
+    }
+
+    let frameId = 0;
+
+    const resetHeroCtaMotion = () => {
+      pageRoot.style.removeProperty('--hero-cta-position-x');
+      pageRoot.style.removeProperty('--hero-cta-position-y');
+      pageRoot.style.removeProperty('--hero-cta-scale');
+      pageRoot.style.removeProperty('--hero-cta-rotate');
+    };
+
+    const setHeroCtaMotion = (x, y, scale = 1, rotate = 0) => {
+      pageRoot.style.setProperty('--hero-cta-position-x', `${x}px`);
+      pageRoot.style.setProperty('--hero-cta-position-y', `${y}px`);
+      pageRoot.style.setProperty('--hero-cta-scale', `${scale}`);
+      pageRoot.style.setProperty('--hero-cta-rotate', `${rotate}deg`);
+    };
+
+    const handlePointerMove = (event) => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        const frameRect = heroFrame.getBoundingClientRect();
+        const ctaRect = heroCta.getBoundingClientRect();
+        const padding = 24;
+        const radiusX = ctaRect.width / 2;
+        const radiusY = ctaRect.height / 2;
+        const minX = radiusX + padding;
+        const maxX = frameRect.width - radiusX - padding;
+        const minY = radiusY + padding;
+        const maxY = frameRect.height - radiusY - padding;
+        const pointerX = event.clientX - frameRect.left;
+        const pointerY = event.clientY - frameRect.top;
+        const nextX = Math.max(minX, Math.min(maxX, pointerX));
+        const nextY = Math.max(minY, Math.min(maxY, pointerY));
+        const rotate = Math.max(-7, Math.min(7, (pointerX - (frameRect.width / 2)) * 0.012));
+
+        setHeroCtaMotion(nextX, nextY, 1.04, rotate);
+      });
+    };
+
+    const handlePointerLeave = () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+        frameId = 0;
+      }
+
+      resetHeroCtaMotion();
+    };
+
+    heroSection.addEventListener('pointermove', handlePointerMove);
+    heroSection.addEventListener('pointerleave', handlePointerLeave);
+    window.addEventListener('scroll', handlePointerLeave, { passive: true });
+    window.addEventListener('resize', handlePointerLeave);
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      heroSection.removeEventListener('pointermove', handlePointerMove);
+      heroSection.removeEventListener('pointerleave', handlePointerLeave);
+      window.removeEventListener('scroll', handlePointerLeave);
+      window.removeEventListener('resize', handlePointerLeave);
+      resetHeroCtaMotion();
+    };
+  }, []);
+
   // === LOGIQUE DE L'IA GEMINI ===
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -293,13 +391,14 @@ export default function ZetaWeb() {
         /* CLASSES D'ANIMATION AU SCROLL */
         .animate-on-scroll {
           opacity: 0;
-          transform: translateY(40px);
+          --scroll-reveal-y: 40px;
+          transform: translateY(var(--scroll-reveal-y));
           transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
           will-change: opacity, transform;
         }
         .animate-on-scroll.is-visible {
           opacity: 1;
-          transform: translateY(0);
+          --scroll-reveal-y: 0px;
         }
         .delay-100 { transition-delay: 100ms; }
         .delay-200 { transition-delay: 200ms; }
@@ -323,17 +422,26 @@ export default function ZetaWeb() {
         }
 
         .hero-copy {
-          transform: translateY(var(--hero-copy-y, 0px));
+          transform: translateY(calc(var(--hero-copy-y, 0px) + var(--scroll-reveal-y, 0px)));
           opacity: var(--hero-copy-opacity, 1);
           transition: transform 180ms linear, opacity 180ms linear;
           will-change: transform, opacity;
         }
 
         .hero-cta {
-          transform: translateY(var(--hero-cta-y, 0px));
+          left: var(--hero-cta-position-x, calc(100% - 136px));
+          top: var(--hero-cta-position-y, calc(100% - 136px));
+          transform: translate3d(-50%, calc(-50% + var(--hero-cta-y, 0px) + var(--scroll-reveal-y, 0px)), 0) rotate(var(--hero-cta-rotate, 0deg)) scale(var(--hero-cta-scale, 1));
           opacity: var(--hero-copy-opacity, 1);
-          transition: transform 180ms linear, opacity 180ms linear;
-          will-change: transform, opacity;
+          transition: left 180ms cubic-bezier(0.22, 1, 0.36, 1), top 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms linear;
+          will-change: left, top, transform, opacity;
+        }
+
+        @media (max-width: 767px) {
+          .hero-cta {
+            left: var(--hero-cta-position-x, 86px);
+            top: var(--hero-cta-position-y, calc(100% - 100px));
+          }
         }
 
         .nav-brand {
@@ -350,6 +458,38 @@ export default function ZetaWeb() {
           transition: transform 180ms linear, opacity 180ms linear;
           will-change: transform, opacity;
         }
+
+        @media (max-width: 767px) {
+          .hero-shell {
+            height: 84svh;
+          }
+
+          .hero-copy h2 {
+            font-size: 2.55rem;
+            line-height: 1.02;
+          }
+
+          .hero-copy span {
+            font-size: 0.68rem;
+          }
+
+          #apropos h2,
+          #boutique h2,
+          #consultant h2,
+          #contact h2 {
+            font-size: 2.25rem;
+          }
+
+          #studio h3 {
+            font-size: 2.1rem;
+          }
+
+          #consultant p,
+          #studio p,
+          #contact p {
+            font-size: 1rem;
+          }
+        }
       `}} />
 
       {/* TOAST NOTIFICATION */}
@@ -359,11 +499,11 @@ export default function ZetaWeb() {
       </div>
 
       {/* BOUTONS DE NAVIGATION FLOTTANTS (HAUT / BAS) */}
-      <div className="fixed bottom-8 right-8 z-[80] flex flex-col gap-3">
+      <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-[80] flex flex-col gap-3">
         {!isAtBottom && (
           <button 
             onClick={scrollToBottom} 
-            className="bg-[#111111] text-[#FCF2E6] p-3 rounded-full shadow-2xl hover:bg-[#C9191E] transition-all transform hover:scale-110"
+            className="bg-[#111111] text-[#FCF2E6] p-2.5 md:p-3 rounded-full shadow-2xl hover:bg-[#C9191E] transition-all transform hover:scale-110"
             title="Aller en bas"
           >
             <ArrowDown size={20} strokeWidth={2.5} />
@@ -372,7 +512,7 @@ export default function ZetaWeb() {
         {isScrolled && (
           <button 
             onClick={scrollToTop} 
-            className="bg-[#111111] text-[#FCF2E6] p-3 rounded-full shadow-2xl hover:bg-[#C9191E] transition-all transform hover:scale-110"
+            className="bg-[#111111] text-[#FCF2E6] p-2.5 md:p-3 rounded-full shadow-2xl hover:bg-[#C9191E] transition-all transform hover:scale-110"
             title="Aller en haut"
           >
             <ArrowUp size={20} strokeWidth={2.5} />
@@ -384,43 +524,60 @@ export default function ZetaWeb() {
       <div className="bg-[#FCF2E6] w-full relative z-10">
 
         {/* 1. NAVIGATION */}
-        <nav className={`fixed w-full z-50 transition-all duration-700 ease-in-out ${isScrolled ? 'bg-[#FCF2E6] py-4 border-b border-[#111111]/5 shadow-sm' : 'bg-transparent py-7'}`}>
-          <div className={`mx-auto flex justify-between items-center transition-all duration-700 ease-in-out ${isScrolled ? 'max-w-[1400px] px-4 md:px-8' : 'max-w-none px-8 md:px-10'}`}>
+        <nav className={`fixed w-full z-50 transition-all duration-700 ease-in-out ${isScrolled ? 'bg-[#FCF2E6] py-3 md:py-4 border-b border-[#111111]/5 shadow-sm' : 'bg-transparent py-4 md:py-7'}`}>
+          <div className={`mx-auto flex justify-between items-center transition-all duration-700 ease-in-out ${isScrolled ? 'max-w-[1400px] px-4 sm:px-5 md:px-8' : 'max-w-none px-4 sm:px-5 md:px-10'}`}>
             
             <div className={`nav-links-group hidden lg:flex flex-1 justify-start ${isScrolled ? 'space-x-6 xl:space-x-8' : 'space-x-8 xl:space-x-10'}`}>
               <a href="#apropos" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Notre Histoire</a>
               <a href="#galerie" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Galerie</a>
               <a href="#boutique" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Boutique</a>
-              <a href="#consultant" className="text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-1 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">
-                Styliste IA <Sparkles size={12} className="text-[#111111]"/>
-              </a>
             </div>
 
-            <div className="nav-brand flex-shrink-0 cursor-pointer flex items-center justify-center gap-3 px-4" onClick={scrollToTop}>
-              <ZetaLogoIcon className="h-8 w-8 md:h-10 md:w-10 text-[#C9191E]" />
-              <span className="font-brand font-bold text-2xl md:text-4xl text-[#C9191E] leading-none pt-1">Zeta</span>
+            <div className="nav-brand flex-shrink-0 cursor-pointer flex items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4" onClick={() => { setIsMobileMenuOpen(false); scrollToTop(); }}>
+              <ZetaLogoIcon className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 text-[#C9191E]" />
+              <span className="font-brand font-bold text-xl sm:text-2xl md:text-4xl text-[#C9191E] leading-none pt-1">Zeta</span>
             </div>
 
-            <div className={`nav-links-group flex flex-1 justify-end items-center ${isScrolled ? 'space-x-6 xl:space-x-8' : 'space-x-8 xl:space-x-10'}`}>
-              <a href="#contact" className="hidden md:block text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Contact</a>
-              <button onClick={() => setIsSearchOpen(true)} className="transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
+            <div className={`nav-links-group flex flex-1 justify-end items-center ${isScrolled ? 'space-x-3 sm:space-x-5 md:space-x-6 xl:space-x-8' : 'space-x-3 sm:space-x-5 md:space-x-8 xl:space-x-10'}`}>
+              <a href="#contact" className="hidden lg:block text-[10px] xl:text-xs font-bold uppercase tracking-[0.2em] transition-all duration-300 whitespace-nowrap text-[#111111] hover:text-[#111111]/70">Contact</a>
+              <button onClick={() => { setIsMobileMenuOpen(false); setIsSearchOpen(true); }} className="transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
                 <Search size={20} strokeWidth={1.5} />
               </button>
-              <button onClick={() => setIsCartOpen(true)} className="relative transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
+              <button onClick={() => { setIsMobileMenuOpen(false); setIsCartOpen(true); }} className="relative transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
                 <ShoppingBag size={20} strokeWidth={1.5} />
                 {cartCount > 0 && (
                   <span className="absolute -top-1 -right-2 bg-[#C9191E] text-[#FCF2E6] text-[9px] font-bold h-4 w-4 flex items-center justify-center rounded-full animate-in zoom-in">{cartCount}</span>
                 )}
               </button>
-              <button className="lg:hidden transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
+              <button onClick={() => setIsMobileMenuOpen((prev) => !prev)} className="lg:hidden transition-all duration-300 text-[#111111] hover:text-[#111111]/70">
                 <Menu size={24} strokeWidth={1.5} />
               </button>
             </div>
           </div>
         </nav>
 
+        {isMobileMenuOpen && (
+          <button
+            type="button"
+            aria-label="Fermer le menu mobile"
+            className="fixed inset-0 z-40 bg-[#111111]/20 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        <div className={`fixed top-[72px] left-4 right-4 z-50 lg:hidden transition-all duration-300 ${isMobileMenuOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-3 pointer-events-none'}`}>
+          <div className="rounded-2xl border border-[#111111]/10 bg-[#FCF2E6]/95 backdrop-blur-md shadow-2xl px-5 py-5">
+            <div className="flex flex-col gap-4 text-[11px] uppercase tracking-[0.22em] font-bold text-[#111111]">
+              <a href="#apropos" onClick={() => setIsMobileMenuOpen(false)}>Notre Histoire</a>
+              <a href="#galerie" onClick={() => setIsMobileMenuOpen(false)}>Galerie</a>
+              <a href="#boutique" onClick={() => setIsMobileMenuOpen(false)}>Boutique</a>
+              <a href="#contact" onClick={() => setIsMobileMenuOpen(false)}>Contact</a>
+            </div>
+          </div>
+        </div>
+
         {/* 2. HERO SECTION */}
-        <section className="pb-16 w-screen relative left-1/2 -translate-x-1/2 animate-on-scroll">
+        <section ref={heroSectionRef} className="pb-10 md:pb-16 w-screen relative left-1/2 -translate-x-1/2 animate-on-scroll">
           <div ref={heroFrameRef} className="hero-shell relative overflow-hidden group border border-[#111111]/5 shadow-xl">
             {/* Vidéo hero plein écran avec fallback poster pour le premier frame */}
             <video
@@ -435,17 +592,17 @@ export default function ZetaWeb() {
               <source src="/hero-video.mp4" type="video/mp4" />
             </video>
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#111111]/50"></div>
-            <div className="absolute inset-x-0 bottom-0 p-8 md:p-16 flex flex-col md:flex-row md:items-end justify-between">
-              <div className="hero-copy max-w-2xl text-[#FCF2E6] animate-on-scroll delay-100">
+            <div className="absolute inset-0 p-5 sm:p-6 md:p-16 flex items-end">
+              <div className="hero-copy max-w-xl md:max-w-2xl text-[#FCF2E6] animate-on-scroll delay-100">
                 <span className="text-xs uppercase tracking-[0.3em] font-semibold mb-6 block drop-shadow-md opacity-90">Nouvelle Collection · Automne 2026</span>
                 <h2 className="font-brand text-5xl md:text-7xl mb-6 leading-[1.1] drop-shadow-2xl shadow-black">L'âme de l'Atlas,<br />l'élégance absolue.</h2>
               </div>
               
-              <div className="hero-cta mt-8 md:mt-0 animate-on-scroll delay-200">
-                 <a href="#boutique" className="group flex items-center justify-center w-36 h-36 rounded-full border border-[#FCF2E6]/30 bg-[#FCF2E6]/10 backdrop-blur-md hover:bg-[#C9191E] hover:border-[#C9191E] transition-all duration-500 ease-out cursor-pointer text-decoration-none">
-                    <span className="text-[#FCF2E6] text-xs font-semibold uppercase tracking-widest text-center flex flex-col items-center">
+              <div ref={heroCtaRef} className="hero-cta absolute z-20 animate-on-scroll delay-200">
+                 <a href="#boutique" className="group flex items-center justify-center w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full border border-[#FCF2E6]/35 bg-[#FCF2E6]/10 backdrop-blur-md active:bg-[#C9191E] active:border-[#C9191E] transition-colors duration-200 ease-out cursor-pointer text-decoration-none">
+                    <span className="text-[#FCF2E6] text-[11px] sm:text-xs font-semibold uppercase tracking-widest text-center flex flex-col items-center">
                       Boutique
-                      <ArrowRight size={18} className="mt-2 -rotate-45 group-hover:rotate-0 transition-transform duration-300" strokeWidth={1.5}/>
+                      <ArrowRight size={18} className="mt-2 -rotate-45 group-active:rotate-0 transition-transform duration-200" strokeWidth={1.5}/>
                     </span>
                  </a>
               </div>
@@ -454,11 +611,11 @@ export default function ZetaWeb() {
         </section>
 
         {/* 3. À PROPOS */}
-        <section id="apropos" className="py-24 px-4 md:px-8 max-w-[1400px] mx-auto">
+        <section id="apropos" className="py-20 md:py-24 px-4 md:px-8 max-w-[1400px] mx-auto">
           <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-center">
-            <div className="order-2 md:order-1 relative h-[500px] md:h-[700px] rounded-lg overflow-hidden group shadow-2xl border border-[#111111]/5 animate-on-scroll">
+            <div className="order-2 md:order-1 relative h-[360px] sm:h-[460px] md:h-[700px] rounded-lg overflow-hidden group shadow-2xl border border-[#111111]/5 animate-on-scroll">
               <SafeImage 
-                src="https://image.pollinations.ai/prompt/Close%20up%20Moroccan%20artisan%20hands%20weaving%20wool%20rug?width=1200&height=800&nologo=true" 
+                src="/notre-histoire.jpeg" 
                 alt="Architecture et Artisanat Marocain" 
                 className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105"
               />
@@ -468,18 +625,18 @@ export default function ZetaWeb() {
               <span className="text-[#C9191E] text-xs uppercase tracking-[0.3em] font-bold mb-6 flex items-center gap-3 animate-on-scroll">
                 <span className="w-8 h-px bg-[#C9191E]"></span> Notre Histoire
               </span>
-              <h2 className="font-brand text-4xl md:text-6xl text-[#111111] mb-8 leading-[1.1] animate-on-scroll delay-100">
+              <h2 className="font-brand text-3xl sm:text-4xl md:text-6xl text-[#111111] mb-6 md:mb-8 leading-[1.1] animate-on-scroll delay-100">
                 L'âme de l'Atlas,<br />tissée à la main.
               </h2>
-              <p className="text-[#111111]/70 font-light text-lg mb-6 leading-relaxed animate-on-scroll delay-200">
+              <p className="text-[#111111]/70 font-light text-base md:text-lg mb-6 leading-relaxed animate-on-scroll delay-200">
                 ZETA est né d'une passion pour le savoir-faire ancestral marocain. Le nom de notre studio dérive directement d'<strong>"Azetta"</strong>, le mot Amazigh désignant le métier à tisser traditionnel.
               </p>
-              <p className="text-[#111111]/70 font-light text-lg mb-10 leading-relaxed animate-on-scroll delay-300">
+              <p className="text-[#111111]/70 font-light text-base md:text-lg mb-8 md:mb-10 leading-relaxed animate-on-scroll delay-300">
                 Nous collaborons sans intermédiaire avec des coopératives de femmes dans les montagnes de l'Atlas. Notre mission est double : préserver un art millénaire et offrir à ces artisanes une rémunération équitable, tout en proposant des pièces d'exception pour l'architecture d'intérieur contemporaine.
               </p>
-              <div className="grid grid-cols-2 gap-6 border-t border-[#111111]/10 pt-8 animate-on-scroll delay-400">
+              <div className="grid grid-cols-2 gap-4 md:gap-6 border-t border-[#111111]/10 pt-6 md:pt-8 animate-on-scroll delay-400">
                 <div>
-                  <p className="font-brand text-4xl text-[#C9191E] mb-2">100%</p>
+                  <p className="font-brand text-3xl md:text-4xl text-[#C9191E] mb-2">100%</p>
                   <p className="text-[10px] uppercase tracking-widest text-[#111111]/60 font-bold">Laine Naturelle</p>
                 </div>
                 <div>
@@ -492,11 +649,11 @@ export default function ZetaWeb() {
         </section>
 
         {/* 4. GALERIE */}
-        <section id="galerie" className="py-16 px-4 md:px-8 max-w-[1400px] mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-16 px-4">
+        <section id="galerie" className="py-14 md:py-16 px-4 md:px-8 max-w-[1400px] mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 md:mb-16 px-0 md:px-4">
             <div className="animate-on-scroll">
               <span className="text-[#C9191E] text-xs uppercase tracking-[0.3em] font-bold mb-4 block">Direction Artistique</span>
-              <h2 className="font-brand text-4xl md:text-5xl text-[#111111]">La <span className="text-[#C9191E]">Galerie</span></h2>
+              <h2 className="font-brand text-3xl sm:text-4xl md:text-5xl text-[#111111]">La <span className="text-[#C9191E]">Galerie</span></h2>
             </div>
             <p className="text-[#111111]/60 font-light text-sm max-w-md mt-6 md:mt-0 md:text-right animate-on-scroll delay-100">
               Une immersion visuelle à travers nos trois piliers photographiques : le geste authentique, l'élégance des espaces, et la matière brute.
@@ -505,7 +662,7 @@ export default function ZetaWeb() {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6">
             <div className="md:col-span-2 md:row-span-2 relative group overflow-hidden bg-[#e2e8f0] rounded-sm animate-on-scroll delay-100">
-              <SafeImage src="https://image.pollinations.ai/prompt/Cinematic%20shot%20Berber%20woman%20weaving%20rug?width=800&height=1000&nologo=true" alt="Le Geste et la Décoration" className="w-full h-full object-cover aspect-[4/5] md:aspect-auto group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
+              <SafeImage src="/gallery-le-geste.jpeg" alt="Le Geste et la Décoration" className="w-full h-full object-cover aspect-[4/5] md:aspect-auto group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
               <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-[#111111]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
                 <div>
                   <p className="text-[#FCF2E6] font-brand text-3xl mb-1">01. Le Geste</p>
@@ -514,7 +671,7 @@ export default function ZetaWeb() {
               </div>
             </div>
             <div className="md:col-span-2 relative group overflow-hidden bg-[#e2e8f0] rounded-sm animate-on-scroll delay-200">
-              <SafeImage src="https://image.pollinations.ai/prompt/Modern%20living%20room%20with%20Moroccan%20rug?width=1200&height=800&nologo=true" alt="L'Espace Minimaliste" className="w-full h-full object-cover aspect-video group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
+              <SafeImage src="/gallery-l-espace.jpeg" alt="L'Espace Minimaliste" className="w-full h-full object-cover aspect-video group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
               <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-[#111111]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
                 <div>
                   <p className="text-[#FCF2E6] font-brand text-3xl mb-1">02. L'Espace</p>
@@ -523,13 +680,13 @@ export default function ZetaWeb() {
               </div>
             </div>
             <div className="md:col-span-1 relative group overflow-hidden bg-[#e2e8f0] rounded-sm animate-on-scroll delay-300">
-              <SafeImage src="https://image.pollinations.ai/prompt/Macro%20texture%20white%20wool%20rug?width=600&height=600&nologo=true" alt="Matière Laine Blanche" className="w-full h-full object-cover aspect-square group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
+              <SafeImage src="/gallery-matiere.jpeg" alt="Matière Laine Blanche" className="w-full h-full object-cover aspect-square group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
               <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
                 <p className="text-[#FCF2E6] font-brand text-2xl mb-1">03. Matière</p>
               </div>
             </div>
             <div className="md:col-span-1 relative group overflow-hidden bg-[#e2e8f0] rounded-sm animate-on-scroll delay-400">
-              <SafeImage src="https://image.pollinations.ai/prompt/Macro%20texture%20black%20wool%20rug?width=600&height=600&nologo=true" alt="Matière Carbone Foncée" className="w-full h-full object-cover aspect-square group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
+              <SafeImage src="/gallery-detail.jpeg" alt="Matière Carbone Foncée" className="w-full h-full object-cover aspect-square group-hover:scale-105 transition-transform duration-[1.5s] ease-out"/>
               <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6">
                 <p className="text-[#FCF2E6] font-brand text-2xl mb-1">04. Détail</p>
               </div>
@@ -538,32 +695,47 @@ export default function ZetaWeb() {
         </section>
 
         {/* 5. BOUTIQUE */}
-        <section id="boutique" className="py-24 px-4 md:px-8 max-w-[1400px] mx-auto mt-12 border-t border-[#111111]/10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 px-4 animate-on-scroll">
+        <section id="boutique" className="py-20 md:py-24 px-4 md:px-8 max-w-[1400px] mx-auto mt-12 border-t border-[#111111]/10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 px-0 md:px-4 animate-on-scroll">
             <div>
               <span className="text-[#C9191E] text-xs uppercase tracking-[0.3em] font-bold mb-4 block">E-Boutique</span>
-              <h2 className="font-brand text-5xl text-[#111111] m-0">Acquérir une <span className="text-[#C9191E]">Pièce</span></h2>
+              <h2 className="font-brand text-4xl sm:text-5xl text-[#111111] m-0">Acquérir une <span className="text-[#C9191E]">Pièce</span></h2>
             </div>
             
-            <div className="flex space-x-6 mt-8 md:mt-0 border-b border-[#111111]/20 pb-2">
-              <button className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9191E] border-b-2 border-[#C9191E] pb-1">Tout voir</button>
-              <button className="text-xs font-bold uppercase tracking-[0.2em] text-[#111111]/50 hover:text-[#111111]">Beni Ouarain</button>
-              <button className="text-xs font-bold uppercase tracking-[0.2em] text-[#111111]/50 hover:text-[#111111]">Kilim</button>
-              <button className="text-xs font-bold uppercase tracking-[0.2em] text-[#111111]/50 hover:text-[#111111]">Zanafi</button>
+            <div className="flex gap-4 sm:gap-6 mt-6 md:mt-0 border-b border-[#111111]/20 pb-2 overflow-x-auto whitespace-nowrap hide-scrollbar w-full md:w-auto pr-2">
+              {boutiqueCollections.map((collection) => {
+                const isActive = activeCollection === collection.id;
+
+                return (
+                  <button
+                    key={collection.id}
+                    type="button"
+                    onClick={() => setActiveCollection(collection.id)}
+                    aria-pressed={isActive}
+                    className={`text-xs font-bold uppercase tracking-[0.2em] pb-1 border-b-2 transition-colors ${
+                      isActive
+                        ? 'text-[#C9191E] border-[#C9191E]'
+                        : 'text-[#111111]/50 border-transparent hover:text-[#111111]'
+                    }`}
+                  >
+                    {collection.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 px-0 md:px-4">
             
             {/* Produit 1 : Beni Ouarain */}
-            <div className="group cursor-pointer animate-on-scroll delay-100" onClick={() => addToCart({ id: 1, name: 'Beni Ouarain Signature', price: 1250, image: 'https://image.pollinations.ai/prompt/White%20Moroccan%20Beni%20Ouarain%20rug%20flat%20lay?width=800&height=1200&nologo=true' })}>
+            <div className={`group cursor-pointer animate-on-scroll delay-100 ${activeCollection !== 'all' && activeCollection !== 'beni-ouarain' ? 'hidden' : ''}`} onClick={() => addToCart({ id: 1, name: 'Beni Ouarain Signature', price: 1250, image: '/boutique-beni-ouarain.jpeg' })}>
               <div className="w-full aspect-[3/4] bg-[#e2e8f0] relative mb-6 overflow-hidden rounded-sm">
-                <SafeImage src="https://image.pollinations.ai/prompt/White%20Moroccan%20Beni%20Ouarain%20rug%20flat%20lay?width=800&height=1200&nologo=true" alt="Tapis Beni Ouarain" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
+                <SafeImage src="/boutique-beni-ouarain.jpeg" alt="Tapis Beni Ouarain" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
                 <div className="absolute top-4 left-4 bg-[#111111] text-[#FCF2E6] text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1 z-10">En Stock</div>
                 
                 <div className="absolute inset-0 bg-[#111111]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); addToCart({ id: 1, name: 'Beni Ouarain Signature', price: 1250, image: 'https://image.pollinations.ai/prompt/White%20Moroccan%20Beni%20Ouarain%20rug%20flat%20lay?width=800&height=1200&nologo=true' }); showToast("Ajouté au panier !"); }}
+                    onClick={(e) => { e.stopPropagation(); addToCart({ id: 1, name: 'Beni Ouarain Signature', price: 1250, image: '/boutique-beni-ouarain.jpeg' }); showToast("Ajouté au panier !"); }}
                     className="bg-[#FCF2E6] text-[#111111] px-6 py-3 uppercase tracking-widest text-[10px] font-bold hover:bg-[#C9191E] hover:text-[#FCF2E6] transition-all transform translate-y-4 group-hover:translate-y-0 duration-300"
                   >
                     Ajouter au panier
@@ -574,21 +746,21 @@ export default function ZetaWeb() {
                 <h4 className="font-brand text-2xl text-[#111111] mb-1 group-hover:text-[#C9191E] transition-colors">Beni Ouarain Signature</h4>
                 <p className="text-[#111111]/50 text-xs font-bold uppercase tracking-[0.1em] m-0">100% Laine Écrue</p>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                 <p className="text-[#111111]/80 font-light text-sm m-0">Format : 200 x 300 cm</p>
                 <p className="font-bold text-lg text-[#C9191E] m-0">1 250 DH</p>
               </div>
             </div>
 
             {/* Produit 2 : Kilim Azilal */}
-            <div className="group cursor-pointer animate-on-scroll delay-200" onClick={() => addToCart({ id: 2, name: 'Kilim Azilal Ocre', price: 890, image: 'https://image.pollinations.ai/prompt/Colorful%20Moroccan%20Kilim%20rug%20flat%20lay?width=800&height=1200&nologo=true' })}>
+            <div className={`group cursor-pointer animate-on-scroll delay-200 ${activeCollection !== 'all' && activeCollection !== 'kilim' ? 'hidden' : ''}`} onClick={() => addToCart({ id: 2, name: 'Kilim Azilal Ocre', price: 890, image: '/boutique-kilim.jpeg' })}>
               <div className="w-full aspect-[3/4] bg-[#e2e8f0] relative mb-6 overflow-hidden rounded-sm">
-                <SafeImage src="https://image.pollinations.ai/prompt/Colorful%20Moroccan%20Kilim%20rug%20flat%20lay?width=800&height=1200&nologo=true" alt="Tapis Kilim Azilal" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
+                <SafeImage src="/boutique-kilim.jpeg" alt="Tapis Kilim Azilal" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
                 <div className="absolute top-4 left-4 bg-[#FCF2E6] text-[#111111] text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1 border border-[#111111]/10 z-10">Pièce Unique</div>
                 
                 <div className="absolute inset-0 bg-[#111111]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); addToCart({ id: 2, name: 'Kilim Azilal Ocre', price: 890, image: 'https://image.pollinations.ai/prompt/Colorful%20Moroccan%20Kilim%20rug%20flat%20lay?width=800&height=1200&nologo=true' }); showToast("Ajouté au panier !"); }}
+                    onClick={(e) => { e.stopPropagation(); addToCart({ id: 2, name: 'Kilim Azilal Ocre', price: 890, image: '/boutique-kilim.jpeg' }); showToast("Ajouté au panier !"); }}
                     className="bg-[#FCF2E6] text-[#111111] px-6 py-3 uppercase tracking-widest text-[10px] font-bold hover:bg-[#C9191E] hover:text-[#FCF2E6] transition-all transform translate-y-4 group-hover:translate-y-0 duration-300"
                   >
                     Ajouter au panier
@@ -599,21 +771,21 @@ export default function ZetaWeb() {
                 <h4 className="font-brand text-2xl text-[#111111] mb-1 group-hover:text-[#C9191E] transition-colors">Kilim Azilal Ocre</h4>
                 <p className="text-[#111111]/50 text-xs font-bold uppercase tracking-[0.1em] m-0">Tissage Ras & Motifs</p>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                 <p className="text-[#111111]/80 font-light text-sm m-0">Format : 150 x 250 cm</p>
                 <p className="font-bold text-lg text-[#C9191E] m-0">890 DH</p>
               </div>
             </div>
 
             {/* Produit 3 : Zanafi Noir */}
-            <div className="group cursor-pointer animate-on-scroll delay-300" onClick={() => addToCart({ id: 3, name: 'Zanafi Noir Carbone', price: 1100, image: 'https://image.pollinations.ai/prompt/Black%20and%20white%20Moroccan%20Zanafi%20rug%20flat%20lay?width=800&height=1200&nologo=true' })}>
+            <div className={`group cursor-pointer animate-on-scroll delay-300 ${activeCollection !== 'all' && activeCollection !== 'zanafi' ? 'hidden' : ''}`} onClick={() => addToCart({ id: 3, name: 'Zanafi Noir Carbone', price: 1100, image: '/boutique-zanafi.jpeg' })}>
               <div className="w-full aspect-[3/4] bg-[#e2e8f0] relative mb-6 overflow-hidden rounded-sm">
-                <SafeImage src="https://image.pollinations.ai/prompt/Black%20and%20white%20Moroccan%20Zanafi%20rug%20flat%20lay?width=800&height=1200&nologo=true" alt="Tapis Zanafi Noir" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
+                <SafeImage src="/boutique-zanafi.jpeg" alt="Tapis Zanafi Noir" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/>
                 <div className="absolute top-4 left-4 bg-[#111111] text-[#FCF2E6] text-[9px] font-bold uppercase tracking-[0.2em] px-3 py-1 z-10">Sur Commande</div>
                 
                 <div className="absolute inset-0 bg-[#111111]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); addToCart({ id: 3, name: 'Zanafi Noir Carbone', price: 1100, image: 'https://image.pollinations.ai/prompt/Black%20and%20white%20Moroccan%20Zanafi%20rug%20flat%20lay?width=800&height=1200&nologo=true' }); showToast("Ajouté au panier !"); }}
+                    onClick={(e) => { e.stopPropagation(); addToCart({ id: 3, name: 'Zanafi Noir Carbone', price: 1100, image: '/boutique-zanafi.jpeg' }); showToast("Ajouté au panier !"); }}
                     className="bg-[#FCF2E6] text-[#111111] px-6 py-3 uppercase tracking-widest text-[10px] font-bold hover:bg-[#C9191E] hover:text-[#FCF2E6] transition-all transform translate-y-4 group-hover:translate-y-0 duration-300"
                   >
                     Commander sur-mesure
@@ -624,7 +796,7 @@ export default function ZetaWeb() {
                 <h4 className="font-brand text-2xl text-[#111111] mb-1 group-hover:text-[#C9191E] transition-colors">Zanafi Noir Carbone</h4>
                 <p className="text-[#111111]/50 text-xs font-bold uppercase tracking-[0.1em] m-0">Laine Contrastée</p>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                 <p className="text-[#111111]/80 font-light text-sm m-0">Format : 170 x 240 cm</p>
                 <p className="font-bold text-lg text-[#C9191E] m-0">1 100 DH</p>
               </div>
@@ -634,8 +806,8 @@ export default function ZetaWeb() {
         </section>
 
         {/* 6. GEMINI AI VISION */}
-        <section id="consultant" className="py-24 px-4 md:px-8 max-w-[1400px] mx-auto border-t border-[#111111]/10">
-          <div className="bg-[#111111] text-[#FCF2E6] p-10 md:p-16 rounded-lg relative overflow-hidden shadow-2xl animate-on-scroll">
+        <section id="consultant" className="py-20 md:py-24 px-4 md:px-8 max-w-[1400px] mx-auto border-t border-[#111111]/10">
+          <div className="bg-[#111111] text-[#FCF2E6] p-6 sm:p-8 md:p-16 rounded-lg relative overflow-hidden shadow-2xl animate-on-scroll">
             <div className="absolute top-0 right-0 w-64 h-64 bg-[#C9191E] rounded-full blur-[120px] opacity-20 pointer-events-none"></div>
             <div className="max-w-3xl mx-auto text-center relative z-10">
               <div className="flex items-center justify-center gap-2 mb-4">
@@ -643,7 +815,7 @@ export default function ZetaWeb() {
                 <span className="text-[#C9191E] text-xs uppercase tracking-[0.3em] font-bold block">Styliste Privé ZETA</span>
               </div>
               <h2 className="font-brand text-4xl md:text-5xl mb-6">Trouvez la pièce parfaite.</h2>
-              <p className="text-[#FCF2E6]/70 font-light text-lg mb-10 leading-relaxed">
+              <p className="text-[#FCF2E6]/70 font-light text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
                 Décrivez l'atmosphère de votre pièce ou <strong>téléchargez une photo</strong> de votre salon. Notre consultant IA analysera visuellement votre espace pour vous recommander la pièce maîtresse idéale.
               </p>
               
@@ -693,7 +865,7 @@ export default function ZetaWeb() {
                 <button 
                   onClick={generateRecommendation}
                   disabled={isAiLoading || (!roomDescription.trim() && !selectedImage)}
-                  className="bg-[#C9191E] text-[#FCF2E6] px-8 py-4 uppercase tracking-[0.2em] text-xs font-bold hover:bg-[#a01317] transition-colors flex items-center justify-center gap-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                  className="bg-[#C9191E] text-[#FCF2E6] w-full sm:w-auto px-6 sm:px-8 py-4 uppercase tracking-[0.2em] text-xs font-bold hover:bg-[#a01317] transition-colors flex items-center justify-center gap-2 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed mt-2"
                 >
                   {isAiLoading ? <><Loader2 size={16} className="animate-spin" /> Analyse Visuelle en cours...</> : <>Conseiller mon espace <Sparkles size={14} /></>}
                 </button>
@@ -719,15 +891,15 @@ export default function ZetaWeb() {
         </section>
 
         {/* 7. STUDIO VIDEO */}
-        <section id="studio" className="py-32 bg-[#111111] text-[#FCF2E6] px-4 md:px-8 border-t border-[#FCF2E6]/5">
-          <div className="max-w-[1400px] mx-auto grid md:grid-cols-12 gap-16 items-center">
+        <section id="studio" className="py-20 md:py-32 bg-[#111111] text-[#FCF2E6] px-4 md:px-8 border-t border-[#FCF2E6]/5">
+          <div className="max-w-[1400px] mx-auto grid md:grid-cols-12 gap-12 md:gap-16 items-center">
             <div className="md:col-span-5 md:pl-8 animate-on-scroll">
               <span className="text-[#C85A17] text-xs uppercase tracking-[0.3em] font-bold mb-6 block">Film d'Animation Promotionnel</span>
               <h3 className="font-brand text-4xl md:text-5xl mb-8 leading-tight">L'histoire de ZETA en mouvement.</h3>
-              <p className="text-[#FCF2E6]/70 font-light text-lg mb-10 leading-relaxed">
+              <p className="text-[#FCF2E6]/70 font-light text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
                 La transparence n'est pas une option, c'est notre éthique. Découvrez le voyage de la <em>Zarbia</em>, depuis l'environnement ancien jusqu'à la modernité. Un périple immersif où le tapis traverse les époques et trouve sa place au cœur des grandes métropoles.
               </p>
-              <div className="grid grid-cols-2 gap-8 border-t border-[#FCF2E6]/20 pt-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 border-t border-[#FCF2E6]/20 pt-8">
                 <div>
                   <span className="block font-brand text-3xl text-[#C9191E] mb-2">Motion</span>
                   <span className="text-[10px] uppercase tracking-widest text-[#FCF2E6]/50 font-semibold">Immersion<br/>Visuelle 3D</span>
@@ -753,8 +925,8 @@ export default function ZetaWeb() {
         </section>
 
         {/* 8. CONTACT */}
-        <section id="contact" className="py-32 px-4 md:px-8 bg-[#FCF2E6] border-t border-[#111111]/10">
-          <div className="max-w-[1400px] mx-auto grid md:grid-cols-2 gap-16 items-center">
+        <section id="contact" className="py-20 md:py-32 px-4 md:px-8 bg-[#FCF2E6] border-t border-[#111111]/10">
+          <div className="max-w-[1400px] mx-auto grid md:grid-cols-2 gap-12 md:gap-16 items-center">
             <div className="animate-on-scroll">
               <span className="text-[#C9191E] text-xs uppercase tracking-[0.3em] font-bold mb-6 flex items-center gap-3">
                 <span className="w-8 h-px bg-[#C9191E]"></span> Contact
@@ -762,7 +934,7 @@ export default function ZetaWeb() {
               <h2 className="font-brand text-4xl md:text-6xl text-[#111111] mb-8 leading-[1.1]">
                 Parlons de votre projet.
               </h2>
-              <p className="text-[#111111]/70 font-light text-lg mb-12 leading-relaxed">
+              <p className="text-[#111111]/70 font-light text-base md:text-lg mb-10 md:mb-12 leading-relaxed">
                 Que ce soit pour une commande de tapis sur-mesure, une collaboration B2B pour vos projets d'architecture, ou une simple question sur nos pièces, le studio est à votre écoute.
               </p>
               
@@ -788,7 +960,7 @@ export default function ZetaWeb() {
               </div>
             </div>
 
-            <div className="bg-[#ffffff] p-8 md:p-12 rounded-xl shadow-2xl border border-[#111111]/5 animate-on-scroll delay-200">
+            <div className="bg-[#ffffff] p-6 sm:p-8 md:p-12 rounded-xl shadow-2xl border border-[#111111]/5 animate-on-scroll delay-200">
               <form className="flex flex-col gap-8" onSubmit={(e) => { e.preventDefault(); showToast("Message envoyé avec succès !"); }}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="flex flex-col gap-2">
@@ -825,12 +997,12 @@ export default function ZetaWeb() {
       </div>
 
       {/* 9. FOOTER (Placé en bas sur le fond noir) */}
-      <footer className="bg-[#111111] text-[#FCF2E6] pt-20 pb-10 w-full relative z-10 border-t border-[#333]">
-        <div className="max-w-[1400px] mx-auto px-8 grid md:grid-cols-4 gap-12 mb-16">
+      <footer className="bg-[#111111] text-[#FCF2E6] pt-16 md:pt-20 pb-10 w-full relative z-10 border-t border-[#333]">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 grid md:grid-cols-4 gap-12 mb-14 md:mb-16">
           <div className="md:col-span-2">
             <div className="flex items-center gap-3 mb-6">
               <ZetaLogoIcon className="h-12 w-12 text-[#FCF2E6]" />
-              <span className="font-brand font-bold text-5xl text-[#FCF2E6] leading-none pt-2">Zeta</span>
+              <span className="font-brand font-bold text-4xl md:text-5xl text-[#FCF2E6] leading-none pt-2">Zeta</span>
             </div>
             <p className="text-[#FCF2E6]/60 font-light max-w-sm text-sm leading-relaxed">
               Une galerie d'art digitale dédiée au tissage marocain premium. Conçu avec éthique, inspiré par l'Atlas.
@@ -854,11 +1026,31 @@ export default function ZetaWeb() {
           </div>
         </div>
         
-        <div className="max-w-[1400px] mx-auto px-8 pt-8 border-t border-[#FCF2E6]/10 flex flex-col md:flex-row justify-between items-center text-[10px] text-[#FCF2E6]/40 uppercase tracking-widest font-bold">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-8 border-t border-[#FCF2E6]/10 flex flex-col md:flex-row justify-between items-start md:items-center text-[10px] text-[#FCF2E6]/40 uppercase tracking-widest font-bold gap-4 md:gap-0">
           <p>© 2026 Zeta Studio. Tous droits réservés.</p>
-          <div className="flex space-x-8 mt-4 md:mt-0">
-            <a href="#" className="hover:text-[#FCF2E6] transition-colors">Instagram</a>
-            <a href="#" className="hover:text-[#FCF2E6] transition-colors">Pinterest</a>
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 mt-0 md:mt-0">
+            <a
+              href="https://www.instagram.com/zeta_studio8?igsh=MTYydXAwcTRsdTYzbg=="
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Instagram Zeta Studio"
+              className="hover:text-[#FCF2E6] transition-colors"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-[18px] w-[18px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" stroke="none" />
+              </svg>
+            </a>
             <a href="#" className="hover:text-[#FCF2E6] transition-colors">Mentions Légales</a>
           </div>
         </div>
@@ -867,32 +1059,32 @@ export default function ZetaWeb() {
       {/* === MODAL RECHERCHE === */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-[100] bg-[#111111]/95 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-          <button onClick={() => setIsSearchOpen(false)} className="absolute top-8 right-8 md:top-12 md:right-12 text-[#FCF2E6] hover:text-[#C9191E] transition-colors">
+          <button onClick={() => setIsSearchOpen(false)} className="absolute top-6 right-6 md:top-12 md:right-12 text-[#FCF2E6] hover:text-[#C9191E] transition-colors">
             <X size={36} strokeWidth={1.5} />
           </button>
           <div className="w-full max-w-3xl relative">
-            <Search size={36} strokeWidth={1.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#FCF2E6]/50" />
+            <Search size={28} strokeWidth={1.5} className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-[#FCF2E6]/50" />
             <input 
               type="text" 
               autoFocus
               placeholder="Rechercher une pièce, un style..." 
-              className="w-full bg-transparent border-b-2 border-[#FCF2E6]/20 text-[#FCF2E6] text-3xl md:text-5xl font-brand py-6 pl-16 focus:outline-none focus:border-[#C9191E] transition-colors"
+              className="w-full bg-transparent border-b-2 border-[#FCF2E6]/20 text-[#FCF2E6] text-2xl sm:text-3xl md:text-5xl font-brand py-4 md:py-6 pl-12 sm:pl-16 focus:outline-none focus:border-[#C9191E] transition-colors"
             />
           </div>
-          <p className="text-[#FCF2E6]/50 mt-8 text-sm uppercase tracking-widest font-semibold">Suggestions : Beni Ouarain, Zanafi, Sur-mesure</p>
+          <p className="text-[#FCF2E6]/50 mt-6 md:mt-8 text-xs sm:text-sm uppercase tracking-widest font-semibold text-center">Suggestions : Beni Ouarain, Zanafi, Sur-mesure</p>
         </div>
       )}
 
       {/* === SIDEBAR PANIER === */}
       <div className={`fixed inset-y-0 right-0 w-full md:w-[450px] bg-[#FCF2E6] z-[100] shadow-2xl transform transition-transform duration-500 ease-in-out flex flex-col ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex items-center justify-between p-8 border-b border-[#111111]/10">
-          <h2 className="font-brand text-4xl text-[#111111] m-0">Votre Panier <span className="text-[#C9191E]">({cartCount})</span></h2>
+        <div className="flex items-center justify-between p-5 sm:p-8 border-b border-[#111111]/10">
+          <h2 className="font-brand text-3xl sm:text-4xl text-[#111111] m-0">Votre Panier <span className="text-[#C9191E]">({cartCount})</span></h2>
           <button onClick={() => setIsCartOpen(false)} className="text-[#111111] hover:text-[#C9191E] transition-colors p-2">
             <X size={28} strokeWidth={1.5} />
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-6 hide-scrollbar">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-8 flex flex-col gap-5 sm:gap-6 hide-scrollbar">
           {cartItems.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-[#111111]/50">
               <ShoppingBag size={48} strokeWidth={1} className="mb-4 text-[#111111]/30" />
@@ -901,7 +1093,7 @@ export default function ZetaWeb() {
             </div>
           ) : (
             cartItems.map(item => (
-              <div key={item.id} className="flex gap-4 bg-[#ffffff] p-4 rounded-sm border border-[#111111]/5 shadow-sm relative group">
+              <div key={item.id} className="flex gap-3 sm:gap-4 bg-[#ffffff] p-3 sm:p-4 rounded-sm border border-[#111111]/5 shadow-sm relative group">
                 <div className="w-24 h-24 bg-[#e2e8f0] rounded-sm overflow-hidden shrink-0 relative">
                   {/* Utilisation de l'image sécurisée pour le panier aussi ! */}
                   <SafeImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -911,7 +1103,7 @@ export default function ZetaWeb() {
                     <h4 className="font-brand text-lg text-[#111111] leading-tight pr-6 m-0">{item.name}</h4>
                     <p className="text-[#111111]/50 text-[10px] uppercase tracking-widest font-bold mt-1 m-0">{item.price} DH</p>
                   </div>
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-2 gap-3 sm:gap-0">
                     <div className="flex items-center border border-[#111111]/20 rounded-sm">
                       <button onClick={() => updateQuantity(item.id, -1)} className="px-2 py-1 text-[#111111]/60 hover:text-[#111111]"><Minus size={14} /></button>
                       <span className="px-2 text-xs font-bold w-8 text-center">{item.quantity}</span>
@@ -929,8 +1121,8 @@ export default function ZetaWeb() {
         </div>
 
         {cartItems.length > 0 && (
-          <div className="p-8 border-t border-[#111111]/10 bg-[#ffffff]">
-            <div className="flex justify-between items-center mb-6">
+          <div className="p-5 sm:p-8 border-t border-[#111111]/10 bg-[#ffffff]">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-6">
               <span className="text-sm uppercase tracking-widest font-bold text-[#111111]/60">Total</span>
               <span className="font-brand text-4xl text-[#111111]">{cartTotal} DH</span>
             </div>
@@ -944,12 +1136,12 @@ export default function ZetaWeb() {
       {/* === MODAL PAIEMENT / CHECKOUT === */}
       {isCheckoutModalOpen && (
         <div className="fixed inset-0 z-[110] bg-[#111111]/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-[#FCF2E6] w-full max-w-lg p-8 md:p-12 rounded-sm shadow-2xl relative">
+          <div className="bg-[#FCF2E6] w-full max-w-lg p-6 sm:p-8 md:p-12 rounded-sm shadow-2xl relative">
             <button onClick={() => setIsCheckoutModalOpen(false)} className="absolute top-6 right-6 text-[#111111]/50 hover:text-[#C9191E] transition-colors">
               <X size={24} strokeWidth={1.5} />
             </button>
             
-            <h2 className="font-brand text-4xl text-[#111111] mb-2">Finaliser l'achat</h2>
+            <h2 className="font-brand text-3xl sm:text-4xl text-[#111111] mb-2">Finaliser l'achat</h2>
             <p className="text-[#111111]/60 font-light text-sm mb-8">Veuillez saisir vos coordonnées de livraison et de paiement.</p>
             
             <form onSubmit={confirmOrder} className="flex flex-col gap-6">
@@ -958,11 +1150,15 @@ export default function ZetaWeb() {
                 <input type="text" required className="border-b border-[#111111]/20 pb-3 bg-transparent focus:outline-none focus:border-[#C9191E] transition-colors text-sm font-medium" placeholder="Emma Dubois" />
               </div>
               <div className="flex flex-col gap-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-[#111111]/60">Adresse Email</label>
+                <input type="email" required className="border-b border-[#111111]/20 pb-3 bg-transparent focus:outline-none focus:border-[#C9191E] transition-colors text-sm font-medium" placeholder="emma@exemple.com" />
+              </div>
+              <div className="flex flex-col gap-2">
                 <label className="text-[10px] uppercase tracking-widest font-bold text-[#111111]/60">Adresse de livraison</label>
                 <input type="text" required className="border-b border-[#111111]/20 pb-3 bg-transparent focus:outline-none focus:border-[#C9191E] transition-colors text-sm font-medium" placeholder="123 Avenue Guéliz, Marrakech" />
               </div>
               
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-2">
                     <label className="text-[10px] uppercase tracking-widest font-bold text-[#111111]/60">Numéro de carte</label>
                     <input type="text" required className="border-b border-[#111111]/20 pb-3 bg-transparent focus:outline-none focus:border-[#C9191E] transition-colors text-sm font-medium" placeholder="**** **** **** ****" />
@@ -973,7 +1169,7 @@ export default function ZetaWeb() {
                   </div>
               </div>
               
-              <div className="mt-4 pt-6 border-t border-[#111111]/10 flex justify-between items-center mb-4">
+              <div className="mt-4 pt-6 border-t border-[#111111]/10 flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-4">
                 <span className="text-xs uppercase tracking-widest font-bold text-[#111111]/60">Total à payer</span>
                 <span className="font-brand text-3xl text-[#C9191E]">{cartTotal} DH</span>
               </div>
